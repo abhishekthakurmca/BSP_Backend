@@ -1,14 +1,11 @@
-
-using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
-namespace MyBackendApp.Models.HomeProfile
+namespace MyBackendApp.Models.HomeProfile;
+
+[Table("homeUser_lookingFor_professionAncillary")]
+public class HomeUserLookingForProfessionAncillary
 {
-    [Table("homeuser_lookingfor_professionancillary")]
-    public class HomeUserLookingForProfessionAncillary
-    {
-        public long Id { get; set; }
-        public long UserId { get; set; }
-        public int AncillaryId { get; set; }
-    }
+    public long Id { get; set; }
+    public long UserId { get; set; }
+    public int AncillaryId { get; set; }
 }

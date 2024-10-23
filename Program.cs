@@ -1,33 +1,20 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
-
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using Serilog;
-using Microsoft.Extensions.FileProviders;
+using MyBackendApp.Services;
+using MyBackendApp.Data;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Configure Serilog for file logging
 Log.Logger = new LoggerConfiguration()
     .WriteTo.File("logs/app-log.txt", rollingInterval: RollingInterval.Day)
     .CreateLogger();
 
 builder.Host.UseSerilog();
 
-// Add logging
-builder.Logging.ClearProviders();
-builder.Logging.AddConsole();
-
-/*
-builder.Host.ConfigureWebHostDefaults(webBuilder =>
-{
-    webBuilder.UseStartup<Startup>();
-});
-*/
-
-// Configure logging
 builder.Logging.ClearProviders();
 builder.Logging.AddConsole();
 builder.Logging.AddDebug();
@@ -37,68 +24,54 @@ builder.Logging.AddDebug();
 builder.Services.AddControllers();
 builder.Services.AddSingleton<IEmailService, DummyEmailService>();
 
-    // JWT SETTINGS
-//var app = builder.Build();
+//Jwt Settings
+var secretKey = builder.Configuration.GetValue<string>("JwtSettings:SecretKey");
+if (string.IsNullOrEmpty(secretKey))
+{
+    Log.Error("JwtSettings:SecretKey is not set.");
+    throw new Exception("Critical configuration is missing.");
+}
+var key = Encoding.ASCII.GetBytes(secretKey);
 
-    // Access the secret key from the configuration
-    var secretKey = builder.Configuration["JwtSettings:SecretKey"];
-    
 
 
-    if (string.IsNullOrEmpty(secretKey))
+builder.Services.AddAuthentication(options =>
+{
+    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+})
+.AddJwtBearer(options =>
+{
+    options.RequireHttpsMetadata = false;
+    options.SaveToken = true;
+    options.TokenValidationParameters = new TokenValidationParameters
     {
-        Log.Error("JwtSettings:SecretKey is not set or is null.");
-        secretKey = "erEYtBnhaM3NO7+esan9ThcXOUtSlXgq4yE5CwAIF5Q=";
-    }
-    else
-    {
-        Log.Information("JwtSettings:SecretKey retrieved successfully.");
-    }
+        ValidateIssuerSigningKey = true,
+        IssuerSigningKey = new SymmetricSecurityKey(key),
+        ValidateIssuer = false,
+        ValidateAudience = false
+    };
+});
 
-
-
-
-    var key = Encoding.ASCII.GetBytes(secretKey);
-
-    builder.Services.AddAuthentication(options =>
-    {
-        options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-        options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
-    })
-    .AddJwtBearer(options =>
-    {
-        options.RequireHttpsMetadata = false;
-        options.SaveToken = true;
-        options.TokenValidationParameters = new TokenValidationParameters
-        {
-            ValidateIssuerSigningKey = true,
-            IssuerSigningKey = new SymmetricSecurityKey(key),
-            ValidateIssuer = false,
-            ValidateAudience = false
-        };
-    });
-
-
-
-
-// This is the code to allow sources to access the api
+// Add-Cors configuration
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowedOrigins", policy =>
     {
-        policy.WithOrigins("http://localhost:3001","https://localhost:3001", "http://localhost:3000","https://localhost:3000", "https://newintestserver.xyz")
+        var allowedOrigins = builder.Configuration.GetSection("CorsSettings:AllowedOrigins").Get<string[]>();
+        policy.WithOrigins(allowedOrigins)
               .AllowAnyHeader()
               .AllowAnyMethod()
               .AllowCredentials();
     });
 });
 
-builder.Services.AddDbContext<AppDbContext>(options =>
+// Database versioning and scoped
+builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseMySql(builder.Configuration.GetConnectionString("DefaultConnection"),
-    new MySqlServerVersion(new Version(8, 0, 21)))); // Ensure the MySQL version matches your setup
+    new MySqlServerVersion(new Version(8, 0, 21))),
+    ServiceLifetime.Scoped);
 
-
-// Add services to the container.
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 
@@ -112,37 +85,39 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
-
-
 var app = builder.Build();
-
-// Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
-    app.UseDeveloperExceptionPage(); // This shows detailed error information during development.
+    app.UseDeveloperExceptionPage();
     app.UseSwagger();
     app.UseSwaggerUI();
 }
 else
 {
-    app.UseDeveloperExceptionPage(); // This shows detailed error information during development.
-    app.UseSwagger();
-    app.UseSwaggerUI();
-
-    //app.UseExceptionHandler("/Home/Error");
-    //app.UseHsts();
+    app.UseExceptionHandler("/Home/Error");
+    app.UseHsts();
+    builder.Logging.AddFilter("Microsoft", LogLevel.Warning);
+    builder.Logging.AddFilter("System", LogLevel.Warning);
 }
 
+//Middleware
 app.UseHttpsRedirection();
+app.UseStaticFiles(); 
+app.UseRouting();
+app.UseCors("AllowedOrigins");
+app.UseAuthentication();
+app.UseAuthorization();
 
-var summaries = new[]
+app.MapControllers();
+
+string[]? summaries = new[]
 {
     "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
 };
 
 app.MapGet("/testdata", () =>
 {
-    var forecast =  Enumerable.Range(1, 5).Select(index =>
+    var forecast = Enumerable.Range(1, 5).Select(index =>
         new TestData
         (
             DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
@@ -155,14 +130,6 @@ app.MapGet("/testdata", () =>
 .WithName("GetTestData")
 .WithOpenApi();
 
-app.UseRouting();
-
-app.UseCors("AllowedOrigins");
-app.UseAuthorization();
-app.MapControllers();
-
-// Enable serving static files from wwwroot
-app.UseStaticFiles(); 
 
 /*
     // Check if the wwwroot directory exists and create it if it doesn't

@@ -19,6 +19,7 @@ appsettings.Development.json
 mono_crash.*
 
 # User-specific files (VSCode)
+.vs
 .vscode/
 .vscode/*
 

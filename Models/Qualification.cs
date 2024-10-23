@@ -6,10 +6,9 @@ namespace MyBackendApp.Models
     [Table("qualification")]
     public class Qualification
     {
-        [Key] // Marks this as the primary key
+        [Key]
         public int QualificationId { get; set; }
-        public int ProfessionId { get; set; } // Upd your table has an Id column
+        public int ProfessionId { get; set; }
         public string Name { get; set; }
-        // Add other columns from your table as needed
     }
 }

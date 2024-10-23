@@ -1,17 +1,14 @@
-
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
-namespace MyBackendApp.Models
-{
+namespace MyBackendApp.Models;
+
 public class Service
 {
-    [Key] // Marks this as the primary key
-    [Column("service_id")] // Map
-    public int ServiceId { get; set; } // Assuming your table has an Id column
+    [Key]
+    [Column("service_id")]
+    public int ServiceId { get; set; }
     public string? Name { get; set; }
-    
     public string? Description { get; set; }
-}
 }
 
