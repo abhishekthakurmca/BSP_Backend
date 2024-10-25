@@ -1,52 +1,45 @@
+using MyBackendApp.IServices;
+using MimeKit;
+using MailKit.Net.Smtp;
 
 namespace MyBackendApp.Services;
-
-public class DummyEmailService : IEmailService
-{
-    public Task SendActivationEmailAsync(string email, string activationLink)
-    {
-        // Log the email sending attempt or do nothing
-        Console.WriteLine($"Pretending to send an email to {email} with activation link {activationLink}");
-        return Task.CompletedTask;
-    }
-}
-/*
-public interface IEmailService
-{
-    Task SendActivationEmailAsync(string email, string activationLink);
-}
 
 public class EmailService : IEmailService
 {
     private readonly IConfiguration _configuration;
+    private readonly ILogger<EmailService> _logger;
 
-    public EmailService(IConfiguration configuration)
+    public EmailService(IConfiguration configuration, ILogger<EmailService> logger)
     {
         _configuration = configuration;
+        _logger = logger;
     }
 
-    public async Task SendActivationEmailAsync(string email, string activationLink)
+    public async Task SendActivationEmailAsync(string recipientEmail, Guid? ActivationCode)
     {
-        var fromAddress = _configuration["EmailSettings:From"];
-        var smtpClient = new System.Net.Mail.SmtpClient(_configuration["EmailSettings:SmtpHost"])
+        try
         {
-            Port = int.Parse(_configuration["EmailSettings:SmtpPort"]),
-            Credentials = new System.Net.NetworkCredential(_configuration["EmailSettings:SmtpUser"], _configuration["EmailSettings:SmtpPass"]),
-            EnableSsl = true,
-        };
+            string activationLink = $"{_configuration["FrontendUrl"]}/activate?code={ActivationCode}&email={recipientEmail}";
+            string body = $"Click <a href={activationLink}>here</a> to activate your account.";
 
-        var mailMessage = new MailMessage
+            var emailMessage = new MimeMessage();
+            emailMessage.From.Add(new MailboxAddress(_configuration["MailSettings:DisplayName"], _configuration["MailSettings:Mail"]));
+            emailMessage.To.Add(new MailboxAddress("", recipientEmail));
+            emailMessage.Subject = "Activate your account";
+            emailMessage.Body = new TextPart("html") { Text = body };
+
+            using (var client = new SmtpClient())
+            {
+                await client.ConnectAsync(_configuration["MailSettings:Host"], Convert.ToInt32(_configuration["MailSettings:Port"]), false);
+                await client.AuthenticateAsync(_configuration["MailSettings:Mail"], _configuration["MailSettings:Password"]);
+                await client.SendAsync(emailMessage);
+                await client.DisconnectAsync(true);
+            }
+        }
+        catch (Exception ex)
         {
-            From = new System.Net.Mail.MailAddress(fromAddress),
-            Subject = "Activate your account",
-            Body = $"Please activate your account by clicking <a href=\"{activationLink}\">here</a>.",
-            IsBodyHtml = true,
-        };
-
-        mailMessage.To.Add(email);
-
-        await smtpClient.SendMailAsync(mailMessage);
+            _logger.LogError($"Exception occurred: {ex.Message} | StackTrace: {ex.StackTrace}");
+            throw new Exception(ex.Message);
+        }
     }
 }
-
-*/

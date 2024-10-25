@@ -1,61 +1,32 @@
 using Microsoft.AspNetCore.Mvc;
-using MyBackendApp.Models;
 using Microsoft.EntityFrameworkCore;
 using MySql.Data.MySqlClient;
 using System.Data;
-
+using MyBackendApp.Dto.Home;
+using MyBackendApp.IServices;
 
 namespace MyBackendApp.Controllers.Registers;
 [ApiController]
 [Route("api/[controller]")]
-public class RegisterController : ControllerBase
+public class RegisterHomeUserController : ControllerBase
 {
     private readonly IConfiguration _configuration;
-    //private readonly IEmailService _emailService;
+    private readonly IHomeUserService _homeUserService;
 
-    public RegisterController(IConfiguration configuration)
+    public RegisterHomeUserController(IConfiguration configuration, IHomeUserService homeUserService)
     {
         _configuration = configuration;
-       // _emailService = emailService;
+        _homeUserService = homeUserService;
     }
 
     [HttpPost]
-    public async Task<IActionResult> Register([FromBody] HomeUser model)
+    public async Task<IActionResult> Register([FromBody] HomeUserDto model)
     {
-        Console.WriteLine($"Arrived in Register");
-
         if (ModelState.IsValid)
         {
-            var activationToken = Guid.NewGuid().ToString();
-
-            string hashedPassword = BCrypt.Net.BCrypt.HashPassword(model.Pwd);
-            Console.WriteLine($"NON Hashed pwd is {model.Pwd}");
-            Console.WriteLine($"hashed pwd is {hashedPassword}");
-
-            using (var connection = new MySqlConnection(_configuration.GetConnectionString("DefaultConnection")))
-            {
-                using (var command = new MySqlCommand("sp_RegisterHomeUserWithActivation", connection))
-                {
-                    command.CommandType = CommandType.StoredProcedure;
-                    command.Parameters.AddWithValue("email", model.Email);
-                    command.Parameters.AddWithValue("pwd", hashedPassword);
-                    command.Parameters.AddWithValue("phone", model.Phone);
-                    command.Parameters.AddWithValue("firstName", model.FirstName);
-                    command.Parameters.AddWithValue("lastName", model.LastName);
-                    command.Parameters.AddWithValue("postcode", model.Postcode);
-                    command.Parameters.AddWithValue("activationToken", activationToken);
-
-                    connection.Open();
-                    await command.ExecuteNonQueryAsync();
-                }
-            }
-
-            //var activationLink = Url.Action(nameof(Activate), "Register", new { token = activationToken }, Request.Scheme);
-            //await _emailService.SendActivationEmailAsync(model.Email, activationLink);
-
-            return Ok(new { message = "User registered successfully. Please check your email to activate your account." });
+            var response = await _homeUserService.RegisterUser(model);
+            return Ok(response);
         }
-
         return BadRequest(ModelState);
     }
 
@@ -87,5 +58,19 @@ public class RegisterController : ControllerBase
                 }
             }
         }
+    }
+
+    [HttpPost("verify-activation")]
+    public IActionResult VerifyActivationCode([FromBody] ActivationRequestDto request)
+    {
+
+        if (string.IsNullOrEmpty(request.ActivationCode))
+            return BadRequest("Activation code is missing.");
+
+        bool isValid = _homeUserService.ActivateUser(request);
+        if (isValid)
+            return Ok(new { message = "Activation successful" });
+
+        return BadRequest("Invalid activation code.");
     }
 }

@@ -7,6 +7,7 @@ using System.Security.Claims;
 using System.Text;
 using MyBackendApp.Data;
 using MyBackendApp.Dto.Home;
+using MyBackendApp.Utils;
 
 namespace MyBackendApp.Controllers.Home;
 [ApiController]
@@ -49,7 +50,6 @@ public class HomeUsersController : ControllerBase
                 Email = e.Email,
             }).ToListAsync();
 
-
         return Ok(users);
     }
 
@@ -68,11 +68,9 @@ public class HomeUsersController : ControllerBase
         return Ok(homeUsers);
     }
 
-
     [HttpPost("login")]
     public async Task<IActionResult> Login([FromBody] LoginRequest request)
     {
-
         _logger.LogInformation("Login attempt for user {Email}", request.Email);
 
         if (!ModelState.IsValid)
@@ -81,18 +79,12 @@ public class HomeUsersController : ControllerBase
             return BadRequest(ModelState);
         }
 
-        _logger.LogInformation("About to run SingleOrDefaultAsync {Email}", request.Email);
         var user = await _context.HomeUsers.SingleOrDefaultAsync(u => u.Email == request.Email);
-        _logger.LogInformation("Finished running SingleOrDefaultAsync {Email}", request.Email);
 
-        _logger.LogInformation("Request pwd {Email}", request.Email);
-        _logger.LogInformation("DB pwd {Email}", user.Pwd);
-
-        if (user == null || !BCrypt.Net.BCrypt.Verify(request.Password, user.Pwd))
+        if (user == null || !SharedResource.VerifyPassword(request.Password, user.Pwd))
         {
             _logger.LogWarning("Invalid login credentials for user {Email}", request.Email);
             return Unauthorized("Invalid credentials");
-
         }
 
         var token = GenerateJwtToken(user);
@@ -109,15 +101,12 @@ public class HomeUsersController : ControllerBase
             var _secretKey = _configuration["JWTSettings:SecretKey"];
 
             //DELETE ME
-            _secretKey = "erEYtBnhaM3NO7+esan9ThcXOUtSlXgq4yE5CwAIF5Q=";
+            //_secretKey = "erEYtBnhaM3NO7+esan9ThcXOUtSlXgq4yE5CwAIF5Q=";
 
-            // Ensure the key is of adequate length and securely encoded
             var key = Encoding.UTF8.GetBytes(_secretKey);
 
-            // Initialize the token handler
             var tokenHandler = new JwtSecurityTokenHandler();
 
-            // Define the token descriptor with claims and signing credentials
             var tokenDescriptor = new SecurityTokenDescriptor
             {
                 Subject = new ClaimsIdentity(new[]
@@ -129,17 +118,14 @@ public class HomeUsersController : ControllerBase
                 SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256Signature)
             };
 
-            // Create the token
             var token = tokenHandler.CreateToken(tokenDescriptor);
 
-            // Return the serialized token
             return tokenHandler.WriteToken(token);
         }
         catch (Exception ex)
         {
-            // Handle or log the exception
             _logger.LogError(ex, "An error occurred while generating the JWT token.");
-            throw;  // Re-throw or handle the exception as needed
+            throw;  
         }
     }
 }

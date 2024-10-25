@@ -25,18 +25,10 @@ public class BusinessUserController : ControllerBase
         _configuration = configuration;
     }
 
-    // DO NOT EXPOSE THIS API
-    /*
-    [HttpGet("businessusers")]
-    public async Task<ActionResult<IEnumerable<BusinessUserModel>>> GetBusinessUsers()
-    {
-        var users = await _context.HomeUsers.ToListAsync();
-        return Ok(users);
-    }
-    */
 
 
-    [HttpGet("business-users-dto")]
+
+    [HttpGet("businessUsersDto")]
     public async Task<ActionResult<IEnumerable<HomeUserDto>>> GetBusinessUserDTO()
     {
         var users = await _context.BusinessUser.Select(
@@ -115,8 +107,7 @@ public class BusinessUserController : ControllerBase
             // Retrieve the secret key from configuration
             var _secretKey = _configuration["JWTSettings:SecretKey"];
             // DELETE ME
-            _secretKey = "erEYtBnhaM3NO7+esan9ThcXOUtSlXgq4yE5CwAIF5Q=";
-
+            
             // Ensure the key is of adequate length and securely encoded
             var key = Encoding.UTF8.GetBytes(_secretKey);
 

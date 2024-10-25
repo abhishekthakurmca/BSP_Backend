@@ -3,7 +3,7 @@ using MyBackendApp.Models;
 using Microsoft.EntityFrameworkCore;
 using MySql.Data.MySqlClient;
 using System.Data;
-using MyBackendApp.Services;
+using MyBackendApp.IServices;
 
 namespace MyBackendApp.Controllers.Registers;
 [ApiController]

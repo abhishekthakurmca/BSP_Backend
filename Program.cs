@@ -4,8 +4,9 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using Serilog;
-using MyBackendApp.Services;
 using MyBackendApp.Data;
+using MyBackendApp.Extensions;
+using MyBackendApp.Mapper;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -22,7 +23,8 @@ builder.Logging.AddDebug();
 
 // Add services to the container.
 builder.Services.AddControllers();
-builder.Services.AddSingleton<IEmailService, DummyEmailService>();
+builder.Services.AddCoreDependencies();
+builder.Services.AddAutoMapper(typeof(MappingProfile));
 
 //Jwt Settings
 var secretKey = builder.Configuration.GetValue<string>("JwtSettings:SecretKey");
